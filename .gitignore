@@ -1,0 +1,16 @@
+# Third-party sources (cloned and patched by setup.sh)
+third_party/
+
+# Build artifacts
+build/
+*.o
+kernel/generated_scripts.c
+kernel/generated_mui.c
+
+# WSL metadata
+*:Zone.Identifier
+
+# Editor/OS artifacts
+*.swp
+*.swo
+*~

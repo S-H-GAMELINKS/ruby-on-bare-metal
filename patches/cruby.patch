@@ -1,0 +1,53 @@
+diff --git a/compile.c b/compile.c
+index bcf22243..7f21c5f7 100644
+--- a/compile.c
++++ b/compile.c
+@@ -9074,6 +9074,9 @@ iseq_builtin_function_lookup(const rb_iseq_t *iseq, const char *name)
+ {
+     int i;
+     const struct rb_builtin_function *table = ISEQ_COMPILE_DATA(iseq)->builtin_function_table;
++    if (!table) {
++        return NULL;
++    }
+     for (i=0; table[i].index != -1; i++) {
+         if (strcmp(table[i].name, name) == 0) {
+             return &table[i];
+@@ -12891,11 +12894,12 @@ ibf_load_builtin(const struct ibf_load *load, ibf_offset_t *offset)
+     }
+ 
+     const struct rb_builtin_function *table = GET_VM()->builtin_function_table;
+-    if (table == NULL) rb_raise(rb_eArgError, "builtin function table is not provided");
++    if (table == NULL) {
++        rb_raise(rb_eArgError, "builtin function table is not provided");
++    }
+     if (strncmp(table[i].name, name, len) != 0) {
+         rb_raise(rb_eArgError, "builtin function index (%d) mismatch (expect %s but %s)", i, name, table[i].name);
+     }
+-    // fprintf(stderr, "load-builtin: name:%s(%d)\n", table[i].name, table[i].argc);
+ 
+     return &table[i];
+ }
+diff --git a/thread_pthread.c b/thread_pthread.c
+index df2940d5..0d8b7910 100644
+--- a/thread_pthread.c
++++ b/thread_pthread.c
+@@ -2065,6 +2065,11 @@ native_thread_init_main_thread_stack(void *addr)
+ static int
+ native_thread_init_stack(rb_thread_t *th, void *local_in_parent_frame)
+ {
++    /* Ruby on Bare Metal: set stack info directly */
++    th->ec->machine.stack_start = local_in_parent_frame;
++    th->ec->machine.stack_maxsize = 8388608; /* 8MB */
++    return 0;
++#if 0 /* original implementation disabled for Ruby on Bare Metal */
+     rb_nativethread_id_t curr = pthread_self();
+ #ifdef RUBY_ASAN_ENABLED
+     local_in_parent_frame = asan_get_real_stack_addr(local_in_parent_frame);
+@@ -2099,6 +2104,7 @@ native_thread_init_stack(rb_thread_t *th, void *local_in_parent_frame)
+     }
+ 
+     return 0;
++#endif /* disabled for Ruby on Bare Metal */
+ }
+ 
+ struct nt_param {
