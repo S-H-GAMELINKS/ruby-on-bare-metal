@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-2.0
  */
 import 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js';
+import 'https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.11.0/lib/addon-fit.js';
 import 'https://unpkg.com/xterm-pty/index.js';
 import initEmscriptenModule from './qemu-system-x86_64.js';
 
@@ -32,9 +33,7 @@ window.startBoot = async function () {
 
   // Set up xterm.js
   var term = new Terminal({
-    cols: 80,
-    rows: 30,
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "'Courier New', monospace",
     theme: { background: "#000000", foreground: "#cccccc", cursor: "#ffffff" }
   });
@@ -43,6 +42,12 @@ window.startBoot = async function () {
   container.style.display = "block";
   document.getElementById("start-screen").style.display = "none";
   term.open(container);
+
+  // Fit terminal to container size
+  var fitAddon = new FitAddon.FitAddon();
+  term.loadAddon(fitAddon);
+  fitAddon.fit();
+  window.addEventListener("resize", function () { fitAddon.fit(); });
 
   // Create PTY pair via xterm-pty
   var pty = openpty();
