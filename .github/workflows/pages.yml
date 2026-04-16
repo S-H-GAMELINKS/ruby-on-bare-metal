@@ -32,7 +32,7 @@ jobs:
             web/qemu-system-x86_64.js
             web/qemu-system-x86_64.wasm
             web/qemu-system-x86_64.worker.js
-          key: qemu-wasm-${{ hashFiles('Makefile', 'patches/qemu-wasm.patch') }}
+          key: qemu-wasm-v2-${{ hashFiles('Makefile', 'patches/qemu-wasm.patch') }}
 
       # ubuntu-latest has: git, docker, python3, ruby pre-installed
       - name: Install kernel build dependencies
