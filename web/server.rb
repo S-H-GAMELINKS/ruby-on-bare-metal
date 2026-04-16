@@ -23,20 +23,7 @@ server = WEBrick::HTTPServer.new(
   )
 )
 
-# Serve extensionless Emscripten output as JavaScript
-server.mount_proc("/qemu-system-x86_64") do |req, res|
-  file = File.join(doc_root, "qemu-system-x86_64")
-  if File.exist?(file)
-    res["Content-Type"] = "application/javascript"
-    res["Cross-Origin-Opener-Policy"] = "same-origin"
-    res["Cross-Origin-Embedder-Policy"] = "require-corp"
-    res.body = File.binread(file)
-  else
-    res.status = 404
-  end
-end
-
-# Inject COOP/COEP headers on all other responses
+# Inject COOP/COEP headers on all responses
 default_servlet = WEBrick::HTTPServlet::FileHandler.new(server, doc_root)
 server.mount_proc("/") do |req, res|
   default_servlet.service(req, res)

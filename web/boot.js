@@ -5,7 +5,7 @@
  */
 import 'https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js';
 import 'https://unpkg.com/xterm-pty/index.js';
-import initEmscriptenModule from './qemu-system-x86_64';
+import initEmscriptenModule from './qemu-system-x86_64.js';
 
 var packFiles = [
   { url: "pack/kernel.elf",         path: "/pack/kernel.elf" },

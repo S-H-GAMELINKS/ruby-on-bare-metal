@@ -29,7 +29,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            web/qemu-system-x86_64
+            web/qemu-system-x86_64.js
             web/qemu-system-x86_64.wasm
             web/qemu-system-x86_64.worker.js
           key: qemu-wasm-${{ hashFiles('Makefile', 'patches/qemu-wasm.patch') }}

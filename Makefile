@@ -240,9 +240,10 @@ build-qemu-wasm: patch-qemu-wasm
 		docker stop build-qemu-wasm && \
 		echo "[wasm] Extracting build artifacts..." && \
 		mkdir -p web && \
-		docker cp build-qemu-wasm:/build/qemu-system-x86_64 web/qemu-system-x86_64 && \
+		docker cp build-qemu-wasm:/build/qemu-system-x86_64 web/qemu-system-x86_64.js && \
 		docker cp build-qemu-wasm:/build/qemu-system-x86_64.wasm web/ && \
 		docker cp build-qemu-wasm:/build/qemu-system-x86_64.worker.js web/ && \
+		sed -i "s|import('./qemu-system-x86_64')|import('./qemu-system-x86_64.js')|g" web/qemu-system-x86_64.worker.js && \
 		docker rm build-qemu-wasm; \
 	else \
 		echo "[wasm] QEMU WASM already built."; \
@@ -275,7 +276,7 @@ clean:
 	rm -rf build $(K64_OBJS) $(BOOT_OBJS) kernel/generated_scripts.c kernel/generated_mui.c
 
 clean-wasm:
-	rm -f web/qemu-system-x86_64 web/qemu-system-x86_64.wasm web/qemu-system-x86_64.worker.js
+	rm -f web/qemu-system-x86_64.js web/qemu-system-x86_64.wasm web/qemu-system-x86_64.worker.js
 	rm -rf web/pack
 	docker rm -f build-qemu-wasm 2>/dev/null || true
 
