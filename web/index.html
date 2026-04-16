@@ -1,0 +1,113 @@
+<!--
+  Ruby on Bare Metal - Browser Demo
+  Based on ktock/qemu-wasm examples (GPLv2).
+  SPDX-License-Identifier: GPL-2.0
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruby on Bare Metal - Browser Demo</title>
+  <script src="coi-serviceworker.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css" crossorigin="anonymous">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      padding: 1rem 2rem;
+      background: #16213e;
+      border-bottom: 1px solid #0f3460;
+    }
+    header h1 { font-size: 1.4rem; color: #e94560; }
+    header p { font-size: 0.85rem; color: #a0a0a0; margin-top: 0.25rem; }
+    #terminal-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    #terminal-container {
+      width: 100%;
+      max-width: 900px;
+      height: 500px;
+      background: #000;
+      border-radius: 6px;
+      overflow: hidden;
+      display: none;
+    }
+    #start-screen {
+      text-align: center;
+    }
+    #start-btn {
+      padding: 0.8rem 2rem;
+      font-size: 1.1rem;
+      background: #e94560;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #start-btn:hover { background: #c73650; }
+    #start-btn:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 1rem;
+      font-size: 0.9rem;
+      color: #a0a0a0;
+    }
+    footer {
+      padding: 0.8rem 2rem;
+      background: #16213e;
+      border-top: 1px solid #0f3460;
+      font-size: 0.75rem;
+      color: #707070;
+    }
+    footer a { color: #e94560; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Ruby on Bare Metal</h1>
+  <p>CRuby 4.0.2 running on a bare-metal x86_64 kernel in your browser via QEMU WebAssembly</p>
+</header>
+
+<div id="terminal-area">
+  <div id="start-screen">
+    <p>Boot a bare-metal kernel running CRuby directly in your browser.</p>
+    <p style="margin-top: 0.5rem; font-size: 0.85rem; color: #a0a0a0;">
+      Requires a modern browser with SharedArrayBuffer support.
+    </p>
+    <button id="start-btn" onclick="startBoot()">Boot Kernel</button>
+    <div id="status"></div>
+  </div>
+  <div id="terminal-container"></div>
+</div>
+
+<footer>
+  <p>
+    QEMU WebAssembly port powered by
+    <a href="https://github.com/ktock/qemu-wasm" target="_blank" rel="noopener">ktock/qemu-wasm</a> (GPLv2).
+    Source code:
+    <a href="https://github.com/S-H-GAMELINKS/ruby-on-bare-metal" target="_blank" rel="noopener">ruby-on-bare-metal</a> (GPLv2).
+  </p>
+</footer>
+
+<script type="module" src="boot.js"></script>
+
+</body>
+</html>

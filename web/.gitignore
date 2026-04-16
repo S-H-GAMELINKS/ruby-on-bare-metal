@@ -1,0 +1,5 @@
+# QEMU WASM build artifacts (built by `make wasm` or CI)
+qemu-system-x86_64
+qemu-system-x86_64.wasm
+qemu-system-x86_64.worker.js
+pack/

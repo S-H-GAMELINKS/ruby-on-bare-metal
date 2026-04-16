@@ -190,14 +190,98 @@ run: build/kernel.elf
 	$(QEMU) -machine q35 -serial stdio -display none -kernel $< -m 512M
 
 # ============================================================
+# WASM build (QEMU compiled to WebAssembly for browser demo)
+# ============================================================
+
+QEMU_WASM_DIR  := third_party/qemu-wasm
+QEMU_WASM_IMG  := buildqemu-ruby-on-bare-metal
+
+setup-qemu-wasm:
+	@test -d $(QEMU_WASM_DIR)/.git || \
+		(echo "[wasm] Cloning qemu-wasm..." && \
+		 git clone --depth 1 https://github.com/ktock/qemu-wasm.git $(QEMU_WASM_DIR))
+	@echo "[wasm] qemu-wasm ready."
+
+patch-qemu-wasm: setup-qemu-wasm
+	@echo "[wasm] Applying patches..."
+	@if [ -d $(QEMU_WASM_DIR)/subprojects/dtc ] && [ ! -w $(QEMU_WASM_DIR)/subprojects/dtc ]; then \
+		echo "[wasm] Fixing permissions on Docker-created files..." && \
+		sudo chown -R $$(id -u):$$(id -g) $(QEMU_WASM_DIR)/subprojects/dtc; \
+	fi
+	cd $(QEMU_WASM_DIR) && git checkout -- . 2>/dev/null; git apply ../../patches/qemu-wasm.patch
+	@if [ -f $(QEMU_WASM_DIR)/subprojects/dtc/meson.build ]; then \
+		sed -i "s/default_options: 'werror=true'/default_options: 'werror=false'/" \
+			$(QEMU_WASM_DIR)/subprojects/dtc/meson.build; \
+	fi
+
+build-qemu-wasm: patch-qemu-wasm
+	@if [ ! -f web/qemu-system-x86_64.wasm ]; then \
+		echo "[wasm] Building Docker image..." && \
+		docker build --network=host -t $(QEMU_WASM_IMG) $(QEMU_WASM_DIR) && \
+		echo "[wasm] Building QEMU for WASM (this takes a while)..." && \
+		docker rm -f build-qemu-wasm 2>/dev/null; \
+		docker run -d --name build-qemu-wasm \
+			-v $$(pwd)/$(QEMU_WASM_DIR):/qemu \
+			$(QEMU_WASM_IMG) sleep infinity && \
+		QEMU_EXTRA_CFLAGS="-O3 -g -Wno-error=unused-command-line-argument -matomics -mbulk-memory -DNDEBUG -DG_DISABLE_ASSERT -D_GNU_SOURCE -sASYNCIFY=1 -pthread -sPROXY_TO_PTHREAD=1 -sFORCE_FILESYSTEM -sALLOW_TABLE_GROWTH -sTOTAL_MEMORY=2300MB -sWASM_BIGINT -sMALLOC=mimalloc --js-library=/build/node_modules/xterm-pty/emscripten-pty.js -sEXPORT_ES6=1 -sASYNCIFY_IMPORTS=ffi_call_js" && \
+		docker exec build-qemu-wasm emconfigure /qemu/configure \
+			--static \
+			--target-list=x86_64-softmmu \
+			--cpu=wasm32 \
+			--cross-prefix= \
+			--without-default-features \
+			--enable-system \
+			--with-coroutine=fiber \
+			--enable-virtfs \
+			--extra-cflags="$$QEMU_EXTRA_CFLAGS" \
+			--extra-cxxflags="$$QEMU_EXTRA_CFLAGS" \
+			--extra-ldflags="-sEXPORTED_RUNTIME_METHODS=getTempRet0,setTempRet0,addFunction,removeFunction,TTY,FS" && \
+		docker exec build-qemu-wasm emmake make -j$$(nproc) qemu-system-x86_64 && \
+		docker stop build-qemu-wasm && \
+		echo "[wasm] Extracting build artifacts..." && \
+		mkdir -p web && \
+		docker cp build-qemu-wasm:/build/qemu-system-x86_64 web/qemu-system-x86_64 && \
+		docker cp build-qemu-wasm:/build/qemu-system-x86_64.wasm web/ && \
+		docker cp build-qemu-wasm:/build/qemu-system-x86_64.worker.js web/ && \
+		docker rm build-qemu-wasm; \
+	else \
+		echo "[wasm] QEMU WASM already built."; \
+	fi
+
+package-wasm: build/kernel.elf build-qemu-wasm
+	@echo "[wasm] Packaging kernel + BIOS files..."
+	@mkdir -p web/pack
+	cp build/kernel.elf web/pack/
+	cp $(QEMU_WASM_DIR)/pc-bios/bios-256k.bin web/pack/
+	cp $(QEMU_WASM_DIR)/pc-bios/kvmvapic.bin web/pack/
+	cp $(QEMU_WASM_DIR)/pc-bios/linuxboot_dma.bin web/pack/
+	cp $(QEMU_WASM_DIR)/pc-bios/multiboot_dma.bin web/pack/
+	cp $(QEMU_WASM_DIR)/pc-bios/vgabios-stdvga.bin web/pack/
+	@echo "[wasm] Packaging complete."
+
+wasm: package-wasm
+	@echo ""
+	@echo "=== WASM build complete ==="
+	@echo "Run 'make wasm-server' to start the dev server."
+
+wasm-server:
+	ruby web/server.rb
+
+# ============================================================
 # Clean targets
 # ============================================================
 
 clean:
 	rm -rf build $(K64_OBJS) $(BOOT_OBJS) kernel/generated_scripts.c kernel/generated_mui.c
 
-distclean: clean
-	rm -rf third_party/cruby third_party/musl third_party/mui
+clean-wasm:
+	rm -f web/qemu-system-x86_64 web/qemu-system-x86_64.wasm web/qemu-system-x86_64.worker.js
+	rm -rf web/pack
+	docker rm -f build-qemu-wasm 2>/dev/null || true
+
+distclean: clean clean-wasm
+	rm -rf third_party/cruby third_party/musl third_party/mui third_party/qemu-wasm
 
 .PHONY: all deps setup setup-clone setup-patch setup-musl setup-cruby-host setup-cruby-cross \
-        run clean distclean
+        run clean clean-wasm distclean \
+        setup-qemu-wasm build-qemu-wasm package-wasm wasm wasm-server

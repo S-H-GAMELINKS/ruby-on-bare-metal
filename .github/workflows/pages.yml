@@ -1,0 +1,76 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cache QEMU WASM build artifacts (very slow to rebuild)
+      - name: Cache QEMU WASM artifacts
+        id: cache-qemu-wasm
+        uses: actions/cache@v4
+        with:
+          path: |
+            web/qemu-system-x86_64
+            web/qemu-system-x86_64.wasm
+            web/qemu-system-x86_64.worker.js
+          key: qemu-wasm-${{ hashFiles('Makefile', 'patches/qemu-wasm.patch') }}
+
+      # ubuntu-latest has: git, docker, python3, ruby pre-installed
+      - name: Install kernel build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld llvm llvm-dev
+
+      # Build kernel.elf
+      - name: Build kernel
+        run: |
+          make setup
+          make
+
+      # Build QEMU WASM inside Docker (skip if cached)
+      - name: Build QEMU WASM
+        if: steps.cache-qemu-wasm.outputs.cache-hit != 'true'
+        run: make build-qemu-wasm
+
+      # Copy kernel + BIOS files into web/pack/
+      - name: Package for web
+        run: |
+          mkdir -p web/pack
+          cp build/kernel.elf web/pack/
+          cp third_party/qemu-wasm/pc-bios/bios-256k.bin web/pack/
+          cp third_party/qemu-wasm/pc-bios/kvmvapic.bin web/pack/
+          cp third_party/qemu-wasm/pc-bios/linuxboot_dma.bin web/pack/
+          cp third_party/qemu-wasm/pc-bios/multiboot_dma.bin web/pack/
+          cp third_party/qemu-wasm/pc-bios/vgabios-stdvga.bin web/pack/
+
+      # Deploy web/ directory to GitHub Pages
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
