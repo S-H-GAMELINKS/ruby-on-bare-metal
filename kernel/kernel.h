@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "console.h"
+
 void serial_init(void);
 void serial_putc(char c);
 void serial_puts(const char *s);

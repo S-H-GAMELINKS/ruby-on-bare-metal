@@ -190,6 +190,93 @@ run: build/kernel.elf
 	$(QEMU) -machine q35 -serial stdio -display none -kernel $< -m 512M
 
 # ============================================================
+# UEFI build (Steam Deck / real hardware USB boot)
+# ============================================================
+
+UEFI_OBJDIR  := build/uefi_obj
+UEFI_CFLAGS  := $(CFLAGS64) -DRUBY_ON_BARE_METAL_UEFI=1
+
+UEFI_K64_C_SRCS := \
+  kernel/kernel_main.c \
+  kernel/uefi_console.c \
+  kernel/panic.c \
+  kernel/memory.c \
+  kernel/timer.c \
+  kernel/embedded_files.c \
+  compat/ruby_on_bare_metal_compat.c \
+  compat/ruby_on_bare_metal_syscall.c \
+  compat/ruby_on_bare_metal_malloc.c \
+  compat/ruby_on_bare_metal_pthread.c \
+  compat/ruby_on_bare_metal_enc.c
+
+UEFI_K64_OBJS := $(addprefix $(UEFI_OBJDIR)/,$(UEFI_K64_C_SRCS:.c=.o)) \
+                 $(UEFI_OBJDIR)/kernel/entry64.o
+
+$(UEFI_OBJDIR)/%.o: %.c kernel/generated_scripts.c kernel/generated_mui.c
+	@mkdir -p $(dir $@)
+	$(CC) $(UEFI_CFLAGS) -c $< -o $@
+
+$(UEFI_OBJDIR)/kernel/entry64.o: kernel/entry64.S
+	@mkdir -p $(dir $@)
+	$(CC) -m64 -c $< -o $@
+
+build/kernel64_uefi.elf: $(UEFI_K64_OBJS) $(LIBS) kernel/kernel64.ld
+	mkdir -p build
+	$(LD) $(LDFLAGS64) -o $@ $(UEFI_K64_OBJS) $(LIBS)
+
+build/kernel64_uefi.bin: build/kernel64_uefi.elf
+	$(OBJCOPY) -O binary $< $@
+
+SHIM_CFLAGS := -target x86_64-unknown-windows-gnu -ffreestanding \
+               -fno-stack-protector -mno-red-zone -O2 -Wall -Wextra
+
+boot/uefi/shim.o: boot/uefi/shim.c boot/uefi/efi.h
+	$(CC) $(SHIM_CFLAGS) -c boot/uefi/shim.c -o $@
+
+boot/uefi/kernel_blob.o: boot/uefi/kernel_blob.S build/kernel64_uefi.bin
+	$(CC) -target x86_64-unknown-windows-gnu -c boot/uefi/kernel_blob.S -o $@
+
+build/kernel.efi: boot/uefi/shim.o boot/uefi/kernel_blob.o
+	mkdir -p build
+	lld-link -subsystem:efi_application -entry:efi_main -nodefaultlib \
+	         -out:$@ boot/uefi/shim.o boot/uefi/kernel_blob.o
+
+build/esp/EFI/BOOT/BOOTX64.EFI: build/kernel.efi
+	mkdir -p build/esp/EFI/BOOT
+	cp $< $@
+
+build/steamdeck.img: build/esp/EFI/BOOT/BOOTX64.EFI
+	@command -v mkfs.fat >/dev/null 2>&1 || { echo "Need dosfstools+mtools. Install: sudo apt install mtools dosfstools" >&2; exit 1; }
+	@command -v mcopy >/dev/null 2>&1 || { echo "Need mtools. Install: sudo apt install mtools" >&2; exit 1; }
+	rm -f $@
+	dd if=/dev/zero of=$@ bs=1M count=64 status=none
+	mkfs.fat -F 32 -n RUBYOS $@ >/dev/null
+	mmd -i $@ ::/EFI ::/EFI/BOOT
+	mcopy -i $@ $< ::/EFI/BOOT/BOOTX64.EFI
+
+OVMF_FD := /usr/share/ovmf/OVMF.fd
+
+# For local dev: use QEMU's VVFAT to serve build/esp/ as a FAT drive.
+# No mtools / dosfstools required.
+run-uefi: build/esp/EFI/BOOT/BOOTX64.EFI
+	$(QEMU) -machine q35 -bios $(OVMF_FD) \
+	        -drive format=raw,file=fat:rw:build/esp \
+	        -serial stdio -m 512M
+
+# Pre-flight check: boot the exact image that will be written to USB.
+run-usb-image: build/steamdeck.img
+	$(QEMU) -machine q35 -bios $(OVMF_FD) \
+	        -drive format=raw,file=$< \
+	        -serial stdio -m 512M
+
+uefi: build/kernel.efi
+usb-image: build/steamdeck.img
+
+usb: build/steamdeck.img
+	@if [ -z "$(DEV)" ]; then echo "Usage: make usb DEV=/dev/sdX"; exit 1; fi
+	@bash tools/make_usb.sh $(DEV) $<
+
+# ============================================================
 # WASM build (QEMU compiled to WebAssembly for browser demo)
 # ============================================================
 
@@ -273,7 +360,8 @@ wasm-server:
 # ============================================================
 
 clean:
-	rm -rf build $(K64_OBJS) $(BOOT_OBJS) kernel/generated_scripts.c kernel/generated_mui.c
+	rm -rf build $(K64_OBJS) $(BOOT_OBJS) kernel/generated_scripts.c kernel/generated_mui.c \
+	       boot/uefi/shim.o boot/uefi/kernel_blob.o
 
 clean-wasm:
 	rm -f web/qemu-system-x86_64.js web/qemu-system-x86_64.wasm web/qemu-system-x86_64.worker.js
@@ -284,5 +372,5 @@ distclean: clean clean-wasm
 	rm -rf third_party/cruby third_party/musl third_party/mui third_party/qemu-wasm
 
 .PHONY: all deps setup setup-clone setup-patch setup-musl setup-cruby-host setup-cruby-cross \
-        run clean clean-wasm distclean \
+        run run-uefi run-usb-image uefi usb usb-image clean clean-wasm distclean \
         setup-qemu-wasm build-qemu-wasm package-wasm wasm wasm-server

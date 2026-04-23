@@ -36,11 +36,18 @@ void ruby_on_bare_metal_cruby_demo(void) {
 
     ruby_script("ruby_on_bare_metal");
 
-    /* Run init.rb */
+    /* Select entry script: UEFI build runs the autonomous dungeon demo
+     * (no keyboard required); QEMU/Multiboot build keeps the interactive
+     * Ruby prompt via init.rb. */
+#ifdef RUBY_ON_BARE_METAL_UEFI
+    const char *entry_script = "/autodemo.rb";
+#else
+    const char *entry_script = "/init.rb";
+#endif
     size_t size = 0;
-    const char *script = ruby_on_bare_metal_embedded_file_data("/init.rb", &size);
+    const char *script = ruby_on_bare_metal_embedded_file_data(entry_script, &size);
     if (!script) {
-        panic("init.rb not found");
+        panic("entry script not found");
     }
 
     serial_puts("ruby eval start\n");

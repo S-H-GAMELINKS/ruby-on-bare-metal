@@ -4,6 +4,11 @@
 .code64
 .global _start64
 _start64:
+    # UEFI path passes EFI_SYSTEM_TABLE* in %rdi (SYSV arg0).
+    # Multiboot path leaves %rdi unspecified — storing it is harmless
+    # because Multiboot builds never read uefi_system_table.
+    mov %rdi, uefi_system_table(%rip)
+
     # Clear 64-bit BSS
     mov $__bss64_start, %rdi
     mov $__bss64_end, %rcx
@@ -20,6 +25,12 @@ _start64:
 1:  cli
     hlt
     jmp 1b
+
+.section .data
+.balign 8
+.global uefi_system_table
+uefi_system_table:
+    .quad 0
 
 .section .bss
 .align 16

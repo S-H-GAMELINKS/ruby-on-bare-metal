@@ -41,8 +41,10 @@ void kernel_main(void) {
   init_musl_tls();
   serial_puts("tls ok\n");
 
+#ifndef RUBY_ON_BARE_METAL_UEFI
   memory_init();
   serial_puts("memory ok\n");
+#endif
 
   if (ruby_on_bare_metal_file_exists("/hello.rb")) {
     serial_puts("embedded script ok\n");
