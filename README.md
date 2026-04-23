@@ -232,7 +232,7 @@ Key files to modify for development:
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v2.0. See the [LICENSE](LICENSE) file for details.
 
 This repository contains only original code and patch files. Third-party dependencies (CRuby, musl libc, mui) are not included in this repository — they are downloaded at build time by `make setup`. When you build the kernel image, the resulting binary links against these libraries statically. Please refer to each dependency's license for redistribution terms of built binaries.
 
