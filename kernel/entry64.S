@@ -17,6 +17,22 @@ _start64:
     xor %rax, %rax
     rep stosq
 
+    # UEFI firmware does not guarantee the same floating-point state as the
+    # Multiboot path. CRuby and the autodemo use libm immediately, so bring
+    # x87/SSE to a known-good state here for both boot paths.
+    mov %cr4, %rax
+    or $(1 << 9 | 1 << 10), %rax
+    mov %rax, %cr4
+
+    mov %cr0, %rax
+    and $~(1 << 2), %rax
+    or $(1 << 1), %rax
+    mov %rax, %cr0
+
+    fninit
+    ldmxcsr default_mxcsr(%rip)
+    fldcw default_fcw(%rip)
+
     # Set up 64-bit stack
     mov $stack64_top, %rsp
 
@@ -31,6 +47,14 @@ _start64:
 .global uefi_system_table
 uefi_system_table:
     .quad 0
+
+.balign 4
+default_mxcsr:
+    .long 0x1f80
+
+.balign 2
+default_fcw:
+    .word 0x037f
 
 .section .bss
 .align 16

@@ -14,3 +14,7 @@ kernel/generated_mui.c
 *.swp
 *.swo
 *~
+
+# Steam Deck markdown
+STEAMDECK_SLIDES_NOTES.md
+ruby/scripts/slides.md

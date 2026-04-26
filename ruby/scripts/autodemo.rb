@@ -21,7 +21,18 @@ VIEW_H = 22
 FOV = 60.0 * Math::PI / 180.0
 HALF_FOV_TAN = Math.tan(FOV / 2.0)
 
+def finite_float?(x)
+  x.is_a?(Numeric) && !x.nan? && !x.infinite?
+rescue
+  false
+end
+
+def sanitize_float(x, fallback = 0.0)
+  finite_float?(x) ? x : fallback
+end
+
 def wall?(x, y)
+  return true unless finite_float?(x) && finite_float?(y)
   ix = x.floor
   iy = y.floor
   return true if iy < 0 || iy >= MAP_H || ix < 0 || ix >= MAP_W
@@ -33,6 +44,9 @@ $py = 2.5
 $pa = 0.3
 
 def cast_ray(ox, oy, rdx, rdy)
+  return [1e30, 0] unless finite_float?(ox) && finite_float?(oy)
+  return [1e30, 0] unless finite_float?(rdx) && finite_float?(rdy)
+
   mx = ox.floor
   my = oy.floor
   ddx = rdx.abs < 1e-9 ? 1e30 : (1.0 / rdx).abs
@@ -68,6 +82,7 @@ def cast_ray(ox, oy, rdx, rdy)
     next unless MAP[my][mx] == "#"
     d = side == 0 ? (mx - ox + (1 - step_x) / 2.0) / rdx
                   : (my - oy + (1 - step_y) / 2.0) / rdy
+    return [1e30, side] unless finite_float?(d)
     return [d.abs, side]
   end
   [1e30, 0]
@@ -87,8 +102,12 @@ def shade_char(d, side)
 end
 
 def render_frame(frame)
-  dx = Math.cos($pa)
-  dy = Math.sin($pa)
+  $px = sanitize_float($px, 2.5)
+  $py = sanitize_float($py, 2.5)
+  $pa = sanitize_float($pa, 0.3)
+
+  dx = sanitize_float(Math.cos($pa), 1.0)
+  dy = sanitize_float(Math.sin($pa), 0.0)
   plane_x = -dy * HALF_FOV_TAN
   plane_y = dx * HALF_FOV_TAN
 
@@ -97,7 +116,7 @@ def render_frame(frame)
   VIEW_W.times do |c|
     cam = 2.0 * c / VIEW_W - 1.0
     d, s = cast_ray($px, $py, dx + plane_x * cam, dy + plane_y * cam)
-    dists[c] = d
+    dists[c] = sanitize_float(d, 1e30)
     sides[c] = s
   end
 
@@ -107,7 +126,7 @@ def render_frame(frame)
   vmid = VIEW_H / 2.0
   VIEW_H.times do |r|
     VIEW_W.times do |c|
-      d = dists[c]
+      d = sanitize_float(dists[c], 1e30)
       lh = d > 0.1 ? (VIEW_H / d) : VIEW_H.to_f
       top = (vmid - lh / 2.0).to_i
       bot = (vmid + lh / 2.0).to_i
@@ -130,8 +149,10 @@ end
 
 def step_ai(frame)
   speed = 0.12
-  nx = $px + Math.cos($pa) * speed
-  ny = $py + Math.sin($pa) * speed
+  dx = sanitize_float(Math.cos($pa), 1.0)
+  dy = sanitize_float(Math.sin($pa), 0.0)
+  nx = sanitize_float($px + dx * speed, $px)
+  ny = sanitize_float($py + dy * speed, $py)
   r = 0.25
   blocked = wall?(nx + r, ny + r) || wall?(nx - r, ny - r) ||
             wall?(nx + r, ny - r) || wall?(nx - r, ny + r)
@@ -146,6 +167,7 @@ def step_ai(frame)
   $pa += 0.05 if frame % 30 == 0
   # Normalize angle to [0, 2π)
   twopi = Math::PI * 2
+  $pa = sanitize_float($pa, 0.3)
   $pa -= twopi while $pa >= twopi
   $pa += twopi while $pa < 0
 end

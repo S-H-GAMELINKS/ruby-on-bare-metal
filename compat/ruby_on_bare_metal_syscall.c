@@ -288,7 +288,12 @@ static long sys_ioctl(int fd, unsigned long request, long arg) {
     /* TIOCGWINSZ = 0x5413 */
     if (request == 0x5413) {
         struct { unsigned short rows, cols, xpixel, ypixel; } *ws = (void *)arg;
-        if (ws) { ws->rows = 25; ws->cols = 80; ws->xpixel = 0; ws->ypixel = 0; }
+        if (ws) {
+            ws->rows = (unsigned short)uefi_console_rows();
+            ws->cols = (unsigned short)uefi_console_cols();
+            ws->xpixel = (unsigned short)uefi_console_pixel_width();
+            ws->ypixel = (unsigned short)uefi_console_pixel_height();
+        }
         return 0;
     }
     /* TCGETS = 0x5401 - terminal attributes */
@@ -320,6 +325,28 @@ static long sys_getuid(void) { return 0; }
 static long sys_getgid(void) { return 0; }
 static long sys_geteuid(void) { return 0; }
 static long sys_getegid(void) { return 0; }
+
+static long sys_select(int nfds, unsigned long *readfds, unsigned long *writefds) {
+    int ready = 0;
+
+    if (readfds && nfds > 0) {
+        if (readfds[0] & 1UL) {
+            if (serial_data_ready()) {
+                readfds[0] = 1UL;
+                ready++;
+            } else {
+                readfds[0] = 0;
+            }
+        }
+    }
+
+    if (writefds && nfds > 2) {
+        writefds[0] &= 0x6UL; /* stdout/stderr */
+        if (writefds[0]) ready++;
+    }
+
+    return ready;
+}
 
 /* ---- Main dispatcher ---- */
 
@@ -362,6 +389,7 @@ long ruby_on_bare_metal_syscall(long n, long a1, long a2, long a3, long a4, long
         }
         return 1;
     }
+    case __NR_select:        return sys_select((int)a1, (unsigned long *)a2, (unsigned long *)a3);
     case __NR_lseek:          return 0;
     case __NR_mmap:           return sys_mmap((void *)a1, (size_t)a2, (int)a3, (int)a4, (int)a5, (off_t)a6);
     case __NR_mprotect:       return sys_mprotect((void *)a1, (size_t)a2, (int)a3);
@@ -462,30 +490,8 @@ long ruby_on_bare_metal_syscall(long n, long a1, long a2, long a3, long a4, long
     case __NR_clock_getres:   return sys_clock_getres((int)a1, (struct timespec *)a2);
     case __NR_exit_group:     serial_puts("exit_group called\n"); for (;;) { __asm__ volatile("hlt"); }
     case __NR_epoll_create1:  return -ENOSYS;
-    case 270: /* pselect6 */ {
-        /* a1=nfds, a2=readfds, a3=writefds, a4=exceptfds, a5=timeout, a6=sigmask */
-        int nfds = (int)a1;
-        unsigned long *readfds = (unsigned long *)a2;
-        unsigned long *writefds = (unsigned long *)a3;
-        int ready = 0;
-        /* Check if stdin (fd 0) is in readfds and has data */
-        if (readfds && nfds > 0) {
-            if (readfds[0] & 1) { /* fd 0 */
-                if (serial_data_ready()) {
-                    readfds[0] = 1; /* only stdin ready */
-                    ready++;
-                } else {
-                    readfds[0] = 0;
-                }
-            }
-        }
-        /* stdout/stderr always writable */
-        if (writefds && nfds > 2) {
-            writefds[0] &= 0x6; /* fds 1,2 */
-            if (writefds[0]) ready++;
-        }
-        return ready;
-    }
+    case 270: /* pselect6 */
+        return sys_select((int)a1, (unsigned long *)a2, (unsigned long *)a3);
     case 271: /* ppoll */ {
         struct { int fd; short events; short revents; } *fds = (void *)a1;
         int nfds = (int)a2;

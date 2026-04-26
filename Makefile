@@ -11,6 +11,7 @@ CRUBY_SRC    := third_party/cruby
 CRUBY_HOST   := $(CRUBY_SRC)/build_host
 CRUBY_BUILD  := $(CRUBY_SRC)/build_ruby_on_bare_metal
 MUI_DIR      := third_party/mui
+MISAKI_BDF   := third_party/fonts/misaki/misaki_gothic.bdf
 
 # Versions
 RUBY_TAG := v4.0.2
@@ -156,7 +157,11 @@ kernel/generated_scripts.c: $(RUBY_SCRIPTS) tools/embed_scripts.rb
 kernel/generated_mui.c: $(MUI_DIR)/lib/mui.rb tools/embed_mui.rb
 	ruby tools/embed_mui.rb $(MUI_DIR)/lib/ > $@
 
+kernel/generated_misaki_font.c: $(MISAKI_BDF) tools/embed_misaki_subset.rb
+	ruby tools/embed_misaki_subset.rb $(MISAKI_BDF) > $@
+
 kernel/embedded_files.o: kernel/generated_scripts.c kernel/generated_mui.c
+kernel/uefi_console.o: kernel/generated_misaki_font.c
 
 # ============================================================
 # Kernel build (two-stage)
@@ -212,7 +217,7 @@ UEFI_K64_C_SRCS := \
 UEFI_K64_OBJS := $(addprefix $(UEFI_OBJDIR)/,$(UEFI_K64_C_SRCS:.c=.o)) \
                  $(UEFI_OBJDIR)/kernel/entry64.o
 
-$(UEFI_OBJDIR)/%.o: %.c kernel/generated_scripts.c kernel/generated_mui.c
+$(UEFI_OBJDIR)/%.o: %.c kernel/generated_scripts.c kernel/generated_mui.c kernel/generated_misaki_font.c
 	@mkdir -p $(dir $@)
 	$(CC) $(UEFI_CFLAGS) -c $< -o $@
 
@@ -360,7 +365,7 @@ wasm-server:
 # ============================================================
 
 clean:
-	rm -rf build $(K64_OBJS) $(BOOT_OBJS) kernel/generated_scripts.c kernel/generated_mui.c \
+	rm -rf build $(K64_OBJS) $(BOOT_OBJS) kernel/generated_scripts.c kernel/generated_mui.c kernel/generated_misaki_font.c \
 	       boot/uefi/shim.o boot/uefi/kernel_blob.o
 
 clean-wasm:

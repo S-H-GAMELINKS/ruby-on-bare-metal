@@ -40,7 +40,7 @@ void ruby_on_bare_metal_cruby_demo(void) {
      * (no keyboard required); QEMU/Multiboot build keeps the interactive
      * Ruby prompt via init.rb. */
 #ifdef RUBY_ON_BARE_METAL_UEFI
-    const char *entry_script = "/autodemo.rb";
+    const char *entry_script = "/slides.rb";
 #else
     const char *entry_script = "/init.rb";
 #endif
@@ -57,10 +57,20 @@ void ruby_on_bare_metal_cruby_demo(void) {
         serial_puts("ruby exception:\n");
         VALUE err = rb_errinfo();
         if (err) {
+            VALUE klass = rb_funcall(err, rb_intern("class"), 0);
+            if (klass) {
+                VALUE klass_name = rb_funcall(klass, rb_intern("to_s"), 0);
+                const char *klass_str = rb_string_value_cstr(&klass_name);
+                if (klass_str) {
+                    serial_puts("  class: ");
+                    serial_puts(klass_str);
+                    serial_putc('\n');
+                }
+            }
             VALUE msg = rb_funcall(err, rb_intern("message"), 0);
             const char *str = rb_string_value_cstr(&msg);
             if (str) {
-                serial_puts("  ");
+                serial_puts("  message: ");
                 serial_puts(str);
                 serial_putc('\n');
             }

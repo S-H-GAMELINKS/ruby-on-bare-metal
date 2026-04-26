@@ -9,3 +9,8 @@
 #define serial_read       uefi_console_read
 #define serial_data_ready uefi_console_data_ready
 #endif
+
+unsigned long uefi_console_cols(void);
+unsigned long uefi_console_rows(void);
+unsigned long uefi_console_pixel_width(void);
+unsigned long uefi_console_pixel_height(void);

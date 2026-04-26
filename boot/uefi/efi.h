@@ -130,13 +130,107 @@ typedef struct {
 typedef EFI_STATUS (EFIAPI *EFI_ALLOCATE_PAGES)(
     EFI_ALLOCATE_TYPE Type, EFI_MEMORY_TYPE MemoryType,
     UINTN Pages, UINT64 *Memory);
+typedef EFI_STATUS (EFIAPI *EFI_SET_WATCHDOG_TIMER)(
+    UINTN Timeout, UINT64 WatchdogCode, UINTN DataSize, CHAR16 *WatchdogData);
+
+typedef EFI_STATUS (EFIAPI *EFI_LOCATE_PROTOCOL)(
+    EFI_GUID *Protocol, VOID *Registration, VOID **Interface);
+
+typedef struct {
+    UINT32 RedMask;
+    UINT32 GreenMask;
+    UINT32 BlueMask;
+    UINT32 ReservedMask;
+} EFI_PIXEL_BITMASK;
+
+typedef enum {
+    PixelRedGreenBlueReserved8BitPerColor,
+    PixelBlueGreenRedReserved8BitPerColor,
+    PixelBitMask,
+    PixelBltOnly,
+    PixelFormatMax
+} EFI_GRAPHICS_PIXEL_FORMAT;
+
+typedef struct {
+    UINT32 Version;
+    UINT32 HorizontalResolution;
+    UINT32 VerticalResolution;
+    EFI_GRAPHICS_PIXEL_FORMAT PixelFormat;
+    EFI_PIXEL_BITMASK PixelInformation;
+    UINT32 PixelsPerScanLine;
+} EFI_GRAPHICS_OUTPUT_MODE_INFORMATION;
+
+typedef struct {
+    UINT32 MaxMode;
+    UINT32 Mode;
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info;
+    UINTN SizeOfInfo;
+    UINT64 FrameBufferBase;
+    UINTN FrameBufferSize;
+} EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE;
+
+struct EFI_GRAPHICS_OUTPUT_PROTOCOL;
+typedef struct EFI_GRAPHICS_OUTPUT_PROTOCOL EFI_GRAPHICS_OUTPUT_PROTOCOL;
+
+typedef EFI_STATUS (EFIAPI *EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE)(
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *This, UINT32 ModeNumber,
+    UINTN *SizeOfInfo, EFI_GRAPHICS_OUTPUT_MODE_INFORMATION **Info);
+typedef EFI_STATUS (EFIAPI *EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE)(
+    EFI_GRAPHICS_OUTPUT_PROTOCOL *This, UINT32 ModeNumber);
+
+struct EFI_GRAPHICS_OUTPUT_PROTOCOL {
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_QUERY_MODE QueryMode;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_SET_MODE   SetMode;
+    VOID                                   *Blt;
+    EFI_GRAPHICS_OUTPUT_PROTOCOL_MODE      *Mode;
+};
 
 typedef struct {
     EFI_TABLE_HEADER  Hdr;
     VOID             *RaiseTPL;
     VOID             *RestoreTPL;
     EFI_ALLOCATE_PAGES AllocatePages;
-    /* many more fields we don't use */
+    VOID             *FreePages;
+    VOID             *GetMemoryMap;
+    VOID             *AllocatePool;
+    VOID             *FreePool;
+    VOID             *CreateEvent;
+    VOID             *SetTimer;
+    VOID             *WaitForEvent;
+    VOID             *SignalEvent;
+    VOID             *CloseEvent;
+    VOID             *CheckEvent;
+    VOID             *InstallProtocolInterface;
+    VOID             *ReinstallProtocolInterface;
+    VOID             *UninstallProtocolInterface;
+    VOID             *HandleProtocol;
+    VOID             *Reserved;
+    VOID             *RegisterProtocolNotify;
+    VOID             *LocateHandle;
+    VOID             *LocateDevicePath;
+    VOID             *InstallConfigurationTable;
+    VOID             *LoadImage;
+    VOID             *StartImage;
+    VOID             *Exit;
+    VOID             *UnloadImage;
+    VOID             *ExitBootServices;
+    VOID             *GetNextMonotonicCount;
+    VOID             *Stall;
+    EFI_SET_WATCHDOG_TIMER SetWatchdogTimer;
+    VOID             *ConnectController;
+    VOID             *DisconnectController;
+    VOID             *OpenProtocol;
+    VOID             *CloseProtocol;
+    VOID             *OpenProtocolInformation;
+    VOID             *ProtocolsPerHandle;
+    VOID             *LocateHandleBuffer;
+    EFI_LOCATE_PROTOCOL LocateProtocol;
+    VOID             *InstallMultipleProtocolInterfaces;
+    VOID             *UninstallMultipleProtocolInterfaces;
+    VOID             *CalculateCrc32;
+    VOID             *CopyMem;
+    VOID             *SetMem;
+    VOID             *CreateEventEx;
 } EFI_BOOT_SERVICES;
 
 typedef struct {

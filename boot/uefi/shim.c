@@ -24,6 +24,10 @@ typedef void (*kernel_entry_t)(EFI_SYSTEM_TABLE *st) __attribute__((sysv_abi));
 EFIAPI EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *st) {
     (void)image_handle;
 
+    if (st->BootServices && st->BootServices->SetWatchdogTimer) {
+        st->BootServices->SetWatchdogTimer(0, 0, 0, 0);
+    }
+
     st->ConOut->ClearScreen(st->ConOut);
     println(st, "Ruby on Bare Metal - UEFI shim");
     println(st, "allocating pages at 0x200000...");
