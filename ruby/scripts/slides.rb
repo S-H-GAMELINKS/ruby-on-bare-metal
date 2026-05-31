@@ -202,6 +202,10 @@ def parse_code_directive(line)
   code_excerpt(m[1], start_line: m[2].to_i, lines: m[3].to_i)
 end
 
+def expand_line_breaks(text)
+  text.to_s.gsub(/<br\s*\/?>/i, "\n").gsub('\\n', "\n")
+end
+
 def parse_markdown(text)
   slides = []
 
@@ -234,7 +238,7 @@ def parse_markdown(text)
       elsif stripped.start_with?('layout:')
         slide.layout = stripped.split(':', 2)[1].to_s.strip
       elsif stripped.start_with?('# ')
-        slide.title = stripped[2..]
+        slide.title = expand_line_breaks(stripped[2..])
       elsif stripped.start_with?('## ')
         slide.subtitle = stripped[3..]
       elsif stripped.start_with?('- ')
@@ -285,13 +289,19 @@ def render_header(slide_index, total, remaining_seconds)
   color('0')
 end
 
+TITLE_MAX_LINES = 2
+TITLE_LINE_ROWS = 2
+
 def render_big_title(row, text)
-  color('1;36')
-  at(row, title_col)
-  title_font(2)
-  $stdout.syswrite(fit(text, title_text_w))
-  title_font(0)
-  color('0')
+  lines = wrap_text(text, title_text_w).first(TITLE_MAX_LINES)
+  lines.each_with_index do |line, idx|
+    color('1;36')
+    at(row + idx * TITLE_LINE_ROWS, title_col)
+    title_font(2)
+    $stdout.syswrite(fit(line, title_text_w))
+    title_font(0)
+    color('0')
+  end
 end
 
 def render_title(title, subtitle = nil)
@@ -322,12 +332,27 @@ def render_title_slide(slide, index, total, remaining_seconds)
 end
 
 def render_bullets(items, start_row)
+  return start_row if items.empty?
+  max_w2 = [content_w / 3, 8].max
+  max_len = items.map { |i| i.to_s.length }.max
+  mode = if max_len <= max_w2
+           2
+         elsif max_len <= bullet_wrap_w
+           1
+         else
+           0
+         end
+  width = case mode
+          when 2 then max_w2
+          when 1 then bullet_wrap_w
+          else        body_compact_w
+          end
+  row_step = mode == 2 ? 2 : 1
+
   row = start_row
   items.each do |item|
-    mode = bullet_font_mode(item)
-    width = bullet_width_for(mode)
     wrap_text(item, width).each_with_index do |line, idx|
-      break if row > body_last_row
+      break if row + row_step - 1 > body_last_row
       color('37')
       at(row, content_col)
       prefix = idx == 0 ? '- ' : '  '
@@ -335,7 +360,7 @@ def render_bullets(items, start_row)
       $stdout.syswrite(fit(prefix + line, width))
       title_font(0)
       color('0')
-      row += 1
+      row += row_step
     end
     row += 1
   end

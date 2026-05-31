@@ -289,10 +289,17 @@ static long sys_ioctl(int fd, unsigned long request, long arg) {
     if (request == 0x5413) {
         struct { unsigned short rows, cols, xpixel, ypixel; } *ws = (void *)arg;
         if (ws) {
+#ifdef RUBY_ON_BARE_METAL_UEFI
             ws->rows = (unsigned short)uefi_console_rows();
             ws->cols = (unsigned short)uefi_console_cols();
             ws->xpixel = (unsigned short)uefi_console_pixel_width();
             ws->ypixel = (unsigned short)uefi_console_pixel_height();
+#else
+            ws->rows = 24;
+            ws->cols = 80;
+            ws->xpixel = 0;
+            ws->ypixel = 0;
+#endif
         }
         return 0;
     }

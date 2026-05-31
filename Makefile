@@ -58,7 +58,7 @@ K64_C_SRCS := \
 K64_ASM_SRCS := kernel/entry64.S
 K64_OBJS := $(K64_C_SRCS:.c=.o) $(K64_ASM_SRCS:.S=.o)
 BOOT_OBJS := boot/boot.o
-RUBY_SCRIPTS := $(wildcard ruby/scripts/*.rb)
+RUBY_SCRIPTS := $(wildcard ruby/scripts/*.rb) $(wildcard ruby/scripts/*.md)
 
 # ============================================================
 # Default target — builds everything including dependencies
