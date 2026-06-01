@@ -261,19 +261,22 @@ build/steamdeck.img: build/esp/EFI/BOOT/BOOTX64.EFI
 	mcopy -i $@ $< ::/EFI/BOOT/BOOTX64.EFI
 
 OVMF_FD := /usr/share/ovmf/OVMF.fd
+UEFI_XRES ?= 1280
+UEFI_YRES ?= 800
+UEFI_VGA := VGA,xres=$(UEFI_XRES),yres=$(UEFI_YRES)
 
 # For local dev: use QEMU's VVFAT to serve build/esp/ as a FAT drive.
 # No mtools / dosfstools required.
 run-uefi: build/esp/EFI/BOOT/BOOTX64.EFI
 	$(QEMU) -machine q35 -bios $(OVMF_FD) \
-	        -vga none -device VGA,xres=1280,yres=800 \
+	        -vga none -device $(UEFI_VGA) \
 	        -drive format=raw,file=fat:rw:build/esp \
 	        -serial stdio -m 512M
 
 # Pre-flight check: boot the exact image that will be written to USB.
 run-usb-image: build/steamdeck.img
 	$(QEMU) -machine q35 -bios $(OVMF_FD) \
-	        -vga none -device VGA,xres=1280,yres=800 \
+	        -vga none -device $(UEFI_VGA) \
 	        -drive format=raw,file=$< \
 	        -serial stdio -m 512M
 

@@ -18,6 +18,7 @@ static int current_font_mode = 0;
 static EFI_SYSTEM_TABLE *st(void) { return uefi_system_table; }
 
 static UINTN font_span(void) {
+    if (current_font_mode >= 3) return 4;
     if (current_font_mode >= 2) return 3;
     if (current_font_mode == 1) return 2;
     return 1;
@@ -284,6 +285,35 @@ static const uint8_t *misaki_glyph_rows(uint32_t codepoint) {
     return NULL;
 }
 
+static int gop_mode_is_usable(EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info) {
+    if (!info) return 0;
+    if (info->PixelFormat == PixelBltOnly) return 0;
+    if (info->HorizontalResolution == 0 || info->VerticalResolution == 0) return 0;
+    if (info->PixelsPerScanLine && info->PixelsPerScanLine < info->HorizontalResolution) return 0;
+    return 1;
+}
+
+#define PREFERRED_GOP_WIDTH  1280
+#define PREFERRED_GOP_HEIGHT 800
+
+static void select_preferred_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop) {
+    if (!gop || !gop->Mode || !gop->QueryMode || !gop->SetMode) return;
+
+    for (UINT32 i = 0; i < gop->Mode->MaxMode; i++) {
+        EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info = 0;
+        UINTN info_size = 0;
+
+        if (gop->QueryMode(gop, i, &info_size, &info) != EFI_SUCCESS) continue;
+        if (!gop_mode_is_usable(info)) continue;
+
+        if (info->HorizontalResolution == PREFERRED_GOP_WIDTH &&
+            info->VerticalResolution == PREFERRED_GOP_HEIGHT) {
+            if (i != gop->Mode->Mode) gop->SetMode(gop, i);
+            return;
+        }
+    }
+}
+
 static void put_pixel(UINTN x, UINTN y, uint32_t color) {
     UINTN px;
     UINTN py;
@@ -334,7 +364,12 @@ static void draw_ascii_glyph(UINTN col, UINTN row, char c, int mode) {
     int pad_y = ASCII_FONT_PAD_Y;
     UINTN box_h = CELL_H;
 
-    if (mode >= 2) {
+    if (mode >= 3) {
+        scale = 8;
+        pad_x = 12;
+        pad_y = 4;
+        box_h = CELL_H * 2;
+    } else if (mode == 2) {
         scale = 6;
         pad_x = 9;
         pad_y = 3;
@@ -369,7 +404,12 @@ static void draw_misaki_glyph(UINTN col, UINTN row, const uint8_t *rows, int mod
     int pad_y = MISAKI_FONT_PAD_Y;
     UINTN box_h = CELL_H;
 
-    if (mode >= 2) {
+    if (mode >= 3) {
+        scale = 8;
+        pad_x = 0;
+        pad_y = 0;
+        box_h = CELL_H * 2;
+    } else if (mode == 2) {
         scale = 6;
         pad_x = 0;
         pad_y = 0;
@@ -558,6 +598,8 @@ static void try_init_gfx(void) {
     if (st()->BootServices->LocateProtocol(&gop_guid, 0, (VOID **)&gop) != EFI_SUCCESS) return;
     if (!gop || !gop->Mode || !gop->Mode->Info) return;
 
+    select_preferred_gop_mode(gop);
+
     mode = gop->Mode;
     if (mode->Info->PixelFormat == PixelBltOnly) return;
 
@@ -628,7 +670,7 @@ static void ansi_exec(char final) {
     } else if (final == 'z') {
         int mode = (csi_n >= 1 && csi_params[0] > 0) ? csi_params[0] : 0;
         if (mode < 0) mode = 0;
-        if (mode > 2) mode = 2;
+        if (mode > 3) mode = 3;
         current_font_mode = mode;
     }
 }

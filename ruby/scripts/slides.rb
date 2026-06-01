@@ -10,6 +10,12 @@ TALK_SECONDS = 5 * 60
 REFRESH_INTERVAL = 0.2
 
 def detect_screen_size
+  if defined?($rbm_console_rows) && defined?($rbm_console_cols)
+    rows = $rbm_console_rows
+    cols = $rbm_console_cols
+    return [cols, rows] if rows && cols && rows > 0 && cols > 0
+  end
+
   if $stdout.respond_to?(:winsize)
     rows, cols = $stdout.winsize
     if rows && cols && rows > 0 && cols > 0
@@ -23,12 +29,28 @@ end
 
 SCREEN_W, SCREEN_H = detect_screen_size
 
+def clamp(value, min_value, max_value)
+  return min_value if value < min_value
+  return max_value if value > max_value
+  value
+end
+
+def layout_margin_cols
+  SCREEN_W >= 120 ? 6 : 2
+end
+
+def max_content_w
+  return 120 if SCREEN_W >= 180
+  return 104 if SCREEN_W >= 120
+  SCREEN_W - (layout_margin_cols * 2) + 1
+end
+
 def content_col
-  @content_col ||= SCREEN_W >= 100 ? 3 : 2
+  @content_col ||= [(SCREEN_W - content_w) / 2 + 1, 1].max
 end
 
 def content_w
-  @content_w ||= [SCREEN_W - (content_col * 2) + 1, 20].max
+  @content_w ||= [[SCREEN_W - (layout_margin_cols * 2) + 1, 20].max, max_content_w].min
 end
 
 def title_col
@@ -60,15 +82,16 @@ def body_compact_w
 end
 
 def title_row
-  3
+  upper = [SCREEN_H - 14, 3].max
+  clamp(SCREEN_H / 8, 3, upper)
 end
 
 def subtitle_row
-  7
+  title_row + 4
 end
 
 def body_start_row(has_subtitle)
-  has_subtitle ? 10 : 8
+  has_subtitle ? subtitle_row + 3 : title_row + 5
 end
 
 def body_last_row
@@ -77,6 +100,10 @@ end
 
 def note_row
   SCREEN_H - 3
+end
+
+def title_slide_title_row
+  clamp((SCREEN_H - 8) / 2, 4, [SCREEN_H - 8, 4].max)
 end
 
 Slide = Struct.new(:title, :subtitle, :bullets, :code, :notes, :layout, keyword_init: true)
@@ -98,7 +125,8 @@ def title_font(mode)
 end
 
 def font_span_for(mode)
-  return 3 if mode >= 2
+  return 4 if mode >= 3
+  return 3 if mode == 2
   return 2 if mode == 1
   1
 end
@@ -349,10 +377,11 @@ end
 
 def render_title_slide(slide, index, total, remaining_seconds)
   render_header(index, total, remaining_seconds)
-  render_big_title(6, slide.title)
+  row = title_slide_title_row
+  render_big_title(row, slide.title)
   if slide.subtitle
     color('1;37')
-    at(11, title_col)
+    at(row + 5, title_col)
     title_font(1)
     $stdout.syswrite(fit(slide.subtitle, subtitle_text_w))
     title_font(0)
@@ -386,7 +415,7 @@ end
 def render_takahashi_slide(slide, index, total, remaining_seconds)
   render_header(index, total, remaining_seconds)
 
-  mode = 2
+  mode = 3
   lines = takahashi_lines(slide.title, mode)
   row_step = 3
   lines = lines.first([((SCREEN_H - 5) / row_step), 1].max)
@@ -394,13 +423,13 @@ def render_takahashi_slide(slide, index, total, remaining_seconds)
   row = [(SCREEN_H - block_h) / 2 + 1, 3].max
 
   lines.each_with_index do |line, idx|
-    render_centered_line(row + idx * row_step, line, mode, '1;37')
+    render_centered_line(row + idx * row_step, line, mode, '1;33')
   end
 
   if slide.subtitle
     subtitle_row = row + block_h + 1
     if subtitle_row < SCREEN_H - 1
-      render_centered_line(subtitle_row, slide.subtitle, 1, '36')
+      render_centered_line(subtitle_row, slide.subtitle, 1, '1;36')
     end
   end
 

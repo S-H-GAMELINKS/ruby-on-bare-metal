@@ -21,6 +21,48 @@ void ruby_on_bare_metal_console_write(const char *buf, size_t len) {
     serial_write(buf, len);
 }
 
+static char *append_ulong(char *p, unsigned long value) {
+    char tmp[32];
+    int n = 0;
+
+    if (value == 0) {
+        *p++ = '0';
+        return p;
+    }
+
+    while (value && n < (int)sizeof(tmp)) {
+        tmp[n++] = (char)('0' + (value % 10));
+        value /= 10;
+    }
+    while (n > 0) *p++ = tmp[--n];
+    return p;
+}
+
+static void define_console_size_globals(void) {
+    char code[192];
+    char *p = code;
+
+    const char prefix[] = "$rbm_console_cols=";
+    const char rows[] = ";$rbm_console_rows=";
+    const char xpixel[] = ";$rbm_console_xpixel=";
+    const char ypixel[] = ";$rbm_console_ypixel=";
+    const char suffix[] = "\n";
+
+    for (size_t i = 0; i < sizeof(prefix) - 1; i++) *p++ = prefix[i];
+    p = append_ulong(p, uefi_console_cols());
+    for (size_t i = 0; i < sizeof(rows) - 1; i++) *p++ = rows[i];
+    p = append_ulong(p, uefi_console_rows());
+    for (size_t i = 0; i < sizeof(xpixel) - 1; i++) *p++ = xpixel[i];
+    p = append_ulong(p, uefi_console_pixel_width());
+    for (size_t i = 0; i < sizeof(ypixel) - 1; i++) *p++ = ypixel[i];
+    p = append_ulong(p, uefi_console_pixel_height());
+    for (size_t i = 0; i < sizeof(suffix) - 1; i++) *p++ = suffix[i];
+    *p = 0;
+
+    int state = 0;
+    rb_eval_string_protect(code, &state);
+}
+
 void ruby_on_bare_metal_cruby_demo(void) {
     volatile int stack_anchor = 0;
     int state = 0;
@@ -33,6 +75,7 @@ void ruby_on_bare_metal_cruby_demo(void) {
      * but we skip command-line processing. */
     extern void rb_call_builtin_inits(void);
     rb_call_builtin_inits();
+    define_console_size_globals();
 
     ruby_script("ruby_on_bare_metal");
 
