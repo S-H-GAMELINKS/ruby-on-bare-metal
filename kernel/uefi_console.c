@@ -93,9 +93,16 @@ static const uint8_t *ascii_glyph_rows(char c) {
     static const uint8_t comma[FONT_H] = { 0, 0, 0, 0, 0x0c, 0x0c, 0x08 };
     static const uint8_t colon[FONT_H] = { 0, 0x0c, 0x0c, 0, 0x0c, 0x0c, 0 };
     static const uint8_t semicolon[FONT_H] = { 0, 0x0c, 0x0c, 0, 0x0c, 0x0c, 0x08 };
+    static const uint8_t quote[FONT_H] = { 0x0a, 0x0a, 0x0a, 0, 0, 0, 0 };
+    static const uint8_t apost[FONT_H] = { 0x04, 0x04, 0x04, 0, 0, 0, 0 };
+    static const uint8_t star[FONT_H] = { 0, 0x04, 0x15, 0x0e, 0x15, 0x04, 0 };
+    static const uint8_t amp[FONT_H] = { 0x0c, 0x12, 0x14, 0x08, 0x15, 0x12, 0x0d };
+    static const uint8_t lt[FONT_H] = { 0x02, 0x04, 0x08, 0x10, 0x08, 0x04, 0x02 };
+    static const uint8_t gt[FONT_H] = { 0x08, 0x04, 0x02, 0x01, 0x02, 0x04, 0x08 };
     static const uint8_t minus[FONT_H] = { 0, 0, 0, 0x1f, 0, 0, 0 };
     static const uint8_t plus[FONT_H] = { 0, 0x04, 0x04, 0x1f, 0x04, 0x04, 0 };
     static const uint8_t slash[FONT_H] = { 0x01, 0x02, 0x04, 0x08, 0x10, 0, 0 };
+    static const uint8_t backslash[FONT_H] = { 0x10, 0x08, 0x04, 0x02, 0x01, 0, 0 };
     static const uint8_t lparen[FONT_H] = { 0x02, 0x04, 0x08, 0x08, 0x08, 0x04, 0x02 };
     static const uint8_t rparen[FONT_H] = { 0x08, 0x04, 0x02, 0x02, 0x02, 0x04, 0x08 };
     static const uint8_t equal[FONT_H] = { 0, 0x1f, 0, 0x1f, 0, 0, 0 };
@@ -104,6 +111,8 @@ static const uint8_t *ascii_glyph_rows(char c) {
     static const uint8_t tilde[FONT_H] = { 0, 0x0a, 0x15, 0, 0, 0, 0 };
     static const uint8_t lbracket[FONT_H] = { 0x0e, 0x08, 0x08, 0x08, 0x08, 0x08, 0x0e };
     static const uint8_t rbracket[FONT_H] = { 0x0e, 0x02, 0x02, 0x02, 0x02, 0x02, 0x0e };
+    static const uint8_t lbrace[FONT_H] = { 0x03, 0x04, 0x04, 0x18, 0x04, 0x04, 0x03 };
+    static const uint8_t rbrace[FONT_H] = { 0x18, 0x04, 0x04, 0x03, 0x04, 0x04, 0x18 };
     static const uint8_t underscore[FONT_H] = { 0, 0, 0, 0, 0, 0, 0x1f };
 
     static const uint8_t zero[FONT_H]  = { 0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e };
@@ -179,9 +188,16 @@ static const uint8_t *ascii_glyph_rows(char c) {
     case ',': return comma;
     case ':': return colon;
     case ';': return semicolon;
+    case '"': return quote;
+    case '\'': return apost;
+    case '*': return star;
+    case '&': return amp;
+    case '<': return lt;
+    case '>': return gt;
     case '-': return minus;
     case '+': return plus;
     case '/': return slash;
+    case '\\': return backslash;
     case '(': return lparen;
     case ')': return rparen;
     case '=': return equal;
@@ -190,6 +206,8 @@ static const uint8_t *ascii_glyph_rows(char c) {
     case '~': return tilde;
     case '[': return lbracket;
     case ']': return rbracket;
+    case '{': return lbrace;
+    case '}': return rbrace;
     case '_': return underscore;
     case '0': return zero;
     case '1': return one;

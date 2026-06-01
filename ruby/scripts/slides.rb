@@ -40,7 +40,7 @@ def title_text_w
 end
 
 def bullet_wrap_w
-  [body_text_w - 2, 10].max
+  [body_text_w, 10].max
 end
 
 def code_inner_w
@@ -97,29 +97,59 @@ def title_font(mode)
   $stdout.syswrite("\x1b[#{mode}z")
 end
 
+def font_span_for(mode)
+  return 3 if mode >= 2
+  return 2 if mode == 1
+  1
+end
+
 def fit(text, width)
-  s = text.to_s
-  s.length > width ? s[0, width] : s.ljust(width)
+  chars = text_chars(text)
+  fitted = chars.length > width ? chars.first(width).join : chars.join
+  fitted + (' ' * [width - chars.length, 0].max)
 end
 
 def center(text, width = SCREEN_W)
-  s = text.to_s
-  pad = width > s.length ? (width - s.length) / 2 : 0
-  (' ' * pad) + s[0, width]
+  chars = text_chars(text)
+  len = chars.length
+  pad = width > len ? (width - len) / 2 : 0
+  (' ' * pad) + chars.first(width).join
 end
 
 def center_double(text, width = SCREEN_W / 2)
+  chars = text_chars(text)
+  len = chars.length
+  pad = width > len ? (width - len) / 2 : 0
+  (' ' * pad) + chars.first(width).join
+end
+
+def utf8_text(text)
   s = text.to_s
-  pad = width > s.length ? (width - s.length) / 2 : 0
-  (' ' * pad) + s[0, width]
+  if s.respond_to?(:encoding) && s.encoding.name != 'UTF-8'
+    s = s.dup
+    s.force_encoding('UTF-8')
+  end
+  if s.respond_to?(:valid_encoding?) && !s.valid_encoding? && s.respond_to?(:scrub)
+    s = s.scrub('?')
+  end
+  s
+end
+
+def text_chars(text)
+  utf8_text(text).each_char.to_a
+rescue
+  text.to_s.bytes.map { |b| b < 0x80 ? b.chr : '?' }
+end
+
+def text_length(text)
+  text_chars(text).length
 end
 
 def wrap_text(text, width)
-  s = text.to_s
   lines = []
   line = ''
 
-  s.each_char do |ch|
+  text_chars(text).each do |ch|
     if ch == "\n"
       lines << line
       line = ''
@@ -139,7 +169,7 @@ def wrap_text(text, width)
 end
 
 def bullet_font_mode(item)
-  item.to_s.length <= bullet_wrap_w ? 1 : 0
+  text_length(item) <= bullet_wrap_w ? 1 : 0
 end
 
 def bullet_width_for(mode)
@@ -194,6 +224,8 @@ def code_excerpt(path, start_line: 1, lines: 8)
     num = (start_line + idx).to_s.rjust(3, ' ')
     "#{num}: #{line}"
   end
+rescue
+  ["code not embedded: #{path}"]
 end
 
 def parse_code_directive(line)
@@ -272,7 +304,7 @@ def fallback_slides
 end
 
 def load_slides
-  data = File.read('/slides.md')
+  data = utf8_text(File.read('/slides.md'))
   parsed = parse_markdown(data)
   parsed.empty? ? fallback_slides : parsed
 rescue
@@ -331,27 +363,78 @@ def render_title_slide(slide, index, total, remaining_seconds)
   end
 end
 
+def render_centered_line(row, text, mode, color_code)
+  span = font_span_for(mode)
+  visual_w = text_length(text) * span
+  col = [(SCREEN_W - visual_w) / 2 + 1, 1].max
+  color(color_code)
+  at(row, col)
+  title_font(mode)
+  $stdout.syswrite(text)
+  title_font(0)
+  color('0')
+end
+
+def takahashi_lines(text, mode)
+  span = font_span_for(mode)
+  max_chars = [[(SCREEN_W - 4) / span, 1].max, 18].min
+  expand_line_breaks(text).split("\n").flat_map do |line|
+    wrap_text(line, max_chars)
+  end
+end
+
+def render_takahashi_slide(slide, index, total, remaining_seconds)
+  render_header(index, total, remaining_seconds)
+
+  mode = 2
+  lines = takahashi_lines(slide.title, mode)
+  row_step = 3
+  lines = lines.first([((SCREEN_H - 5) / row_step), 1].max)
+  block_h = (lines.length - 1) * row_step + 2
+  row = [(SCREEN_H - block_h) / 2 + 1, 3].max
+
+  lines.each_with_index do |line, idx|
+    render_centered_line(row + idx * row_step, line, mode, '1;37')
+  end
+
+  if slide.subtitle
+    subtitle_row = row + block_h + 1
+    if subtitle_row < SCREEN_H - 1
+      render_centered_line(subtitle_row, slide.subtitle, 1, '36')
+    end
+  end
+
+  render_footer(slide.notes) if slide.notes
+end
+
 def render_bullets(items, start_row)
   return start_row if items.empty?
-  max_w2 = [content_w / 3, 8].max
-  max_len = items.map { |i| i.to_s.length }.max
-  mode = if max_len <= max_w2
-           2
-         elsif max_len <= bullet_wrap_w
-           1
-         else
-           0
-         end
-  width = case mode
-          when 2 then max_w2
-          when 1 then bullet_wrap_w
-          else        body_compact_w
-          end
-  row_step = mode == 2 ? 2 : 1
+  layouts = [
+    [2, [content_w / 3, 8].max, 2],
+    [1, bullet_wrap_w, 1],
+    [0, body_compact_w, 1]
+  ]
+  available_rows = [body_last_row - start_row + 1, 1].max
+  selected_layout = layouts.find do |_candidate_mode, candidate_width, _candidate_row_step|
+    text_width = [candidate_width - 2, 1].max
+    items.all? { |item| text_length(item) <= text_width }
+  end
+
+  selected_layout ||= layouts.find do |_candidate_mode, candidate_width, candidate_row_step|
+    needed_rows = 0
+    items.each_with_index do |item, idx|
+      text_width = [candidate_width - 2, 1].max
+      needed_rows += wrap_text(item, text_width).length * candidate_row_step
+      needed_rows += 1 if idx + 1 < items.length
+    end
+    needed_rows <= available_rows
+  end || layouts.last
+  mode, width, row_step = selected_layout
 
   row = start_row
   items.each do |item|
-    wrap_text(item, width).each_with_index do |line, idx|
+    text_width = [width - 2, 1].max
+    wrap_text(item, text_width).each_with_index do |line, idx|
       break if row + row_step - 1 > body_last_row
       color('37')
       at(row, content_col)
@@ -398,7 +481,7 @@ def render_footer(text)
   return unless text
   color('36')
   at(SCREEN_H - 1, content_col)
-  mode = text.to_s.length <= body_text_w ? 1 : 0
+  mode = text_length(text) <= body_text_w ? 1 : 0
   width = mode == 1 ? body_text_w : content_w
   title_font(mode)
   $stdout.syswrite(fit(text, width))
@@ -410,6 +493,10 @@ def render_slide(slide, index, total, remaining_seconds)
   cls
   if slide.layout == 'title'
     render_title_slide(slide, index, total, remaining_seconds)
+    return
+  end
+  if slide.layout == 'takahashi' || slide.layout == 'big'
+    render_takahashi_slide(slide, index, total, remaining_seconds)
     return
   end
 

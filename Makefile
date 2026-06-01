@@ -59,6 +59,7 @@ K64_ASM_SRCS := kernel/entry64.S
 K64_OBJS := $(K64_C_SRCS:.c=.o) $(K64_ASM_SRCS:.S=.o)
 BOOT_OBJS := boot/boot.o
 RUBY_SCRIPTS := $(wildcard ruby/scripts/*.rb) $(wildcard ruby/scripts/*.md)
+SLIDE_CODE_FILES := compat/ruby_on_bare_metal_compat.c kernel/uefi_console.c
 
 # ============================================================
 # Default target — builds everything including dependencies
@@ -147,8 +148,8 @@ setup-cruby-cross: setup-musl setup-cruby-host setup-patch
 # Script embedding
 # ============================================================
 
-kernel/generated_scripts.c: $(RUBY_SCRIPTS) tools/embed_scripts.rb
-	ruby tools/embed_scripts.rb ruby/scripts/ > $@.tmp
+kernel/generated_scripts.c: $(RUBY_SCRIPTS) $(SLIDE_CODE_FILES) tools/embed_scripts.rb
+	ruby tools/embed_scripts.rb ruby/scripts/ $(SLIDE_CODE_FILES) > $@.tmp
 	sed -i '1,2d' $@.tmp
 	echo '/* Auto-generated */' > $@
 	cat $@.tmp >> $@
@@ -265,12 +266,14 @@ OVMF_FD := /usr/share/ovmf/OVMF.fd
 # No mtools / dosfstools required.
 run-uefi: build/esp/EFI/BOOT/BOOTX64.EFI
 	$(QEMU) -machine q35 -bios $(OVMF_FD) \
+	        -vga none -device VGA,xres=1280,yres=800 \
 	        -drive format=raw,file=fat:rw:build/esp \
 	        -serial stdio -m 512M
 
 # Pre-flight check: boot the exact image that will be written to USB.
 run-usb-image: build/steamdeck.img
 	$(QEMU) -machine q35 -bios $(OVMF_FD) \
+	        -vga none -device VGA,xres=1280,yres=800 \
 	        -drive format=raw,file=$< \
 	        -serial stdio -m 512M
 
